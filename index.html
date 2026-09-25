@@ -91,6 +91,24 @@ main{padding:16px; max-width:760px; margin:0 auto;}
 .result p{color:var(--sub); font-size:15px;}
 .restart{margin-top:16px; padding:14px 24px; border:none; border-radius:16px; background:var(--blue);
   color:#fff; font-weight:700; font-size:15px; cursor:pointer;}
+
+/* ---------- Gamification / celebration ---------- */
+.opt.correct{animation:pop .35s ease;}
+@keyframes pop{0%{transform:scale(1);} 40%{transform:scale(1.05);} 100%{transform:scale(1);}}
+.badge.pulse{animation:badgepulse .4s ease;}
+@keyframes badgepulse{0%{transform:scale(1);} 50%{transform:scale(1.25);} 100%{transform:scale(1);}}
+.points-fly{position:fixed; font-weight:800; font-size:20px; color:var(--green); z-index:200;
+  pointer-events:none; animation:fly 1s ease-out forwards;}
+@keyframes fly{0%{opacity:1; transform:translateY(0);} 100%{opacity:0; transform:translateY(-60px);}}
+.confetti-piece{position:fixed; top:-20px; font-size:22px; z-index:199; pointer-events:none;
+  animation:fall linear forwards;}
+@keyframes fall{to{transform:translateY(110vh) rotate(360deg); opacity:0.2;}}
+.streak-banner{position:fixed; top:80px; left:50%; transform:translate(-50%,-20px); z-index:201;
+  background:linear-gradient(90deg,#FF9500,#FF2D55); color:#fff; font-weight:800; font-size:14px;
+  padding:10px 20px; border-radius:20px; box-shadow:0 6px 20px rgba(0,0,0,0.2); opacity:0;
+  animation:banner 1.6s ease forwards;}
+@keyframes banner{0%{opacity:0; transform:translate(-50%,-20px);} 15%{opacity:1; transform:translate(-50%,0);}
+  85%{opacity:1; transform:translate(-50%,0);} 100%{opacity:0; transform:translate(-50%,-20px);}}
 </style>
 </head>
 <body>
@@ -98,7 +116,10 @@ main{padding:16px; max-width:760px; margin:0 auto;}
 <header>
   <div class="tier1">
     <h1>🎓 A1 Practice</h1>
-    <div class="badge" id="totalBadge">⭐ 0 / 0</div>
+    <div style="display:flex; gap:8px;">
+      <div class="badge" id="streakBadge">🔥 0</div>
+      <div class="badge" id="totalBadge">⭐ 0 / 0</div>
+    </div>
   </div>
   <div class="tier2" id="chips"></div>
 </header>
@@ -241,6 +262,10 @@ const DATA = {
 let progress = {};
 Object.keys(DATA).forEach(k=>progress[k]={done:0,score:0});
 let current = null, qi = 0, answered = false;
+let streak = 0;
+
+const PRAISE = ["Awesome! 🎉","Brilliant! ✨","You got it! 🚀","Nice one! 🙌","Superb! 🌟","Great job! 👏","Excellent! 💫","Well done! 🎈"];
+const ENCOURAGE = ["Nice try — keep going! 💪","Almost there! 🌱","No worries, you've got this! 🙂","Good attempt — try the next one! 🔄","Keep practising, you're learning! 📚","So close! Try again next time! ⭐"];
 
 function totalMax(){
   return Object.values(DATA).reduce((a,c)=>a+c.q.length,0);
@@ -248,6 +273,38 @@ function totalMax(){
 function updateBadge(){
   let s=0; Object.values(progress).forEach(p=>s+=p.score);
   document.getElementById('totalBadge').textContent = `⭐ ${s} / ${totalMax()}`;
+}
+function pulseBadge(id){
+  const el = document.getElementById(id);
+  el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse');
+}
+function updateStreakBadge(){
+  document.getElementById('streakBadge').textContent = `🔥 ${streak}`;
+}
+function flyPoints(x, y, text){
+  const el = document.createElement('div');
+  el.className = 'points-fly'; el.textContent = text;
+  el.style.left = x+'px'; el.style.top = y+'px';
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 1000);
+}
+function confettiBurst(){
+  const emojis = ['🎉','✨','⭐','🎊','💫'];
+  for(let i=0;i<14;i++){
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+    el.style.left = Math.random()*100+'vw';
+    el.style.animationDuration = (1.2+Math.random()*0.8)+'s';
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 2200);
+  }
+}
+function streakBanner(msg){
+  const el = document.createElement('div');
+  el.className = 'streak-banner'; el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(), 1700);
 }
 
 function renderChips(){
@@ -313,13 +370,23 @@ function selectOpt(btn, val){
     if(o.textContent === q.answer) o.classList.add('correct');
   });
   progress[current].done++;
+  const rect = btn.getBoundingClientRect();
   if(val === q.answer){
     btn.classList.add('correct');
-    fb.textContent = '✓ Correct!'; fb.className = 'feedback ok';
+    const praise = PRAISE[Math.floor(Math.random()*PRAISE.length)];
+    fb.textContent = `✓ ${praise}`; fb.className = 'feedback ok';
     progress[current].score++;
+    streak++;
+    updateStreakBadge(); pulseBadge('streakBadge');
+    flyPoints(rect.left+rect.width/2, rect.top, '+10');
+    confettiBurst();
+    if(streak > 0 && streak % 3 === 0){ streakBanner(`🔥 ${streak} in a row! You're on fire!`); }
   } else {
     btn.classList.add('wrong');
-    fb.textContent = `✗ Not quite — the answer is "${q.answer}"`; fb.className = 'feedback bad';
+    const enc = ENCOURAGE[Math.floor(Math.random()*ENCOURAGE.length)];
+    fb.textContent = `✗ ${enc} (Answer: "${q.answer}")`; fb.className = 'feedback bad';
+    streak = 0;
+    updateStreakBadge();
   }
   document.getElementById('nextBtn').disabled = false;
 }
